@@ -1,0 +1,36 @@
+{
+  "summary": "Tested TanStack Start app (JUJ Digital Gems clone). Backend REST API on localhost:3000 fully functional (6/6 passing + 1 skipped for ingress routing). Frontend home, catalog menu, category pages, offer detail (with breadcrumb, image, price, option dropdown, seller card, disabled Buy, trust box), seller page, search, mobile 390px layout, and theme toggle (light/dark/system via Account menu) all work correctly. Login is BROKEN due to missing SUPABASE_SERVICE_ROLE_KEY env var - server-side /api/v1/auth/login crashes. External ingress routes /api/* to unused FastAPI (returns 404) - all internal /api/v1 calls work fine because they are same-origin from the SSR Vite app.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "/api/v1/auth/login (internal)", "issue": "Returns HTML error page 'This page didn't load' due to Missing SUPABASE_SERVICE_ROLE_KEY. createSupabaseAdminClient throws in client.server.ts. Blocks the entire auth flow (login, /api/v1/auth/me returns 'unauthorized', /favorites redirects to /auth).", "priority": "CRITICAL"}
+    ],
+    "minor": [
+      {"endpoint": "External https://<preview>/api/v1/*", "issue": "Ingress routes /api/* to port 8001 FastAPI (unused), so external /api/v1/categories returns 404. All UI works because requests are made same-origin by SSR. Documented; not blocking."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Supabase email+password login (/auth)", "issue": "Submit stays on /auth with 'Logging in...' then nothing. Server endpoint 500s because SUPABASE_SERVICE_ROLE_KEY is not set in /app/frontend/.env. Also means Add-to-Favorites + /favorites page cannot be tested end-to-end.", "affected_selectors": ["input[type=email]", "input[type=password]", "button:has-text('Log in')"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_api_v1.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Add SUPABASE_SERVICE_ROLE_KEY to /app/frontend/.env (the service_role key from Supabase project udogoqxzrvlmucaycozx). Without it: login + favorites + auth-gated flows are blocked. User explicitly asked to show preview even if outside keys missing, so this is an external dependency, not a code bug — but it must be flagged to the user so they can paste the key.",
+    "Optional: configure ingress so external /api/v1/* reaches the Vite SSR process on :3000 instead of the unused FastAPI on :8001, OR document that external API consumers should use the Vite dev URL. Currently only matters for someone consuming the REST API from outside the browser; the UI itself is unaffected because browsers call same-origin."
+  ],
+  "critical_code_review_comments": [
+    "/app/frontend/src/integrations/supabase/client.server.ts throws a hard error when SUPABASE_SERVICE_ROLE_KEY is missing. Consider graceful degradation or clearer startup-time error so the login button could show an inline message instead of a generic 'This page didn't load' HTML.",
+    "The ingress rule routing /api/* to FastAPI conflicts with the Vite app's own /api/v1 routes. Either rename the Vite API prefix (e.g. /app-api/) or add an ingress exception for /api/v1/*.",
+    "App has no data-testid attributes per user's instruction to not modify; this makes future testing fragile but intentional."
+  ],
+  "updated_files": ["/app/backend/tests/test_api_v1.py"],
+  "success_rate": {"backend": "100% (local, 6/6, 1 skipped for known ingress limitation)", "frontend": "~90% - all public flows pass; auth-gated flows blocked by missing env key"},
+  "test_credentials": "buyer1@juj.test / JujDemo2026! (per /app/memory/test_credentials.md) - cannot be validated until SUPABASE_SERVICE_ROLE_KEY added",
+  "seed_data_creation": "None. Seed data lives in remote Supabase (drizzle/migrations/0001_migration.sql).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Internal API base is http://localhost:3000/api/v1 - external preview URL /api/* is intercepted by k8s ingress and sent to unused FastAPI. Login requires SUPABASE_SERVICE_ROLE_KEY in /app/frontend/.env; once added, re-run /app/backend/tests/test_api_v1.py and the full Playwright login+favorites flow. Theme toggle is inside the 'Account' dropdown (Login button in header) - items 'Light', 'Dark', 'System'. Offer detail path pattern: /catalog/product/<slug>-<id> e.g. /catalog/product/roblox-gift-card-robux-code-2.",
+  "rca of the issue": "Login failure RCA: 1) User clicks Log in -> client posts to /api/v1/auth/login (SSR route). 2) Route imports supabaseAdmin from client.server.ts. 3) createSupabaseAdminClient reads process.env.SUPABASE_SERVICE_ROLE_KEY. 4) Env var is absent in /app/frontend/.env, so the function throws 'Missing Supabase environment variable(s): SUPABASE_SERVICE_ROLE_KEY. Connect Supabase in Lovable Cloud.' 5) TanStack Start returns a generic 'This page didn't load' HTML page. Mitigation: add the key to /app/frontend/.env and run `sudo supervisorctl restart frontend`."
+}
