@@ -4,13 +4,13 @@ import { z } from "zod";
 import { fetchCategory } from "@/lib/catalog.functions";
 import { OfferGrid } from "@/components/site/OfferCard";
 import { Crumbs } from "@/components/site/Crumbs";
+import { useI18n } from "@/i18n";
 
 const searchSchema = z.object({ sort: z.enum(["popular", "price_asc", "price_desc"]).optional().catch(undefined) });
 
 export const Route = createFileRoute("/catalog/$categorySlug")({
   validateSearch: searchSchema,
-  loaderDeps: ({ search }) => ({ sort: search.sort ?? "popular" }),
-  loader: async ({ params, deps, context }) => {
+  loader: async ({ params }) => {
     if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(params.categorySlug)) throw notFound();
     const data = await fetchCategory({ data: { slug: params.categorySlug } });
     if (!data) throw notFound();
@@ -37,6 +37,7 @@ function CategoryPage() {
   const { category, path, offerCount } = Route.useLoaderData();
   const { sort = "popular" } = Route.useSearch();
   const navigate = Route.useNavigate();
+  const { t } = useI18n();
   const [showAll, setShowAll] = useState(false);
   const subs = showAll ? category.children : category.children.slice(0, 6);
   return (
@@ -44,32 +45,33 @@ function CategoryPage() {
       <Crumbs path={path} />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">{category.name}</h1>
-          <p className="text-sm text-muted-foreground">{offerCount} offers</p>
+          <h1 className="text-3xl font-bold" data-testid="category-title">{category.name}</h1>
+          <p className="text-sm text-muted-foreground" data-testid="category-offer-count">{t("{n} offers", { n: offerCount })}</p>
         </div>
         <label className="flex items-center gap-2 text-sm">
-          Sort
+          {t("Sort")}
           <select
             value={sort}
+            data-testid="category-sort-select"
             onChange={(e) => navigate({ search: { sort: e.target.value as typeof sort }, replace: true })}
             className="rounded-md border bg-background px-2 py-1.5"
           >
-            <option value="popular">Popular</option>
-            <option value="price_asc">Price: low to high</option>
-            <option value="price_desc">Price: high to low</option>
+            <option value="popular">{t("Popular")}</option>
+            <option value="price_asc">{t("Price: low to high")}</option>
+            <option value="price_desc">{t("Price: high to low")}</option>
           </select>
         </label>
       </div>
       {category.children.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {subs.map((c) => (
-            <Link key={c.id} to="/catalog/$categorySlug" params={{ categorySlug: c.slug }} className="rounded-full border px-3 py-1 text-sm hover:border-primary hover:bg-accent">
+            <Link key={c.id} to="/catalog/$categorySlug" params={{ categorySlug: c.slug }} data-testid={`subcategory-chip-${c.slug}`} className="rounded-full border px-3 py-1 text-sm hover:border-primary hover:bg-accent">
               {c.name}
             </Link>
           ))}
           {category.children.length > 6 && (
             <button onClick={() => setShowAll((v) => !v)} className="rounded-full px-3 py-1 text-sm text-primary underline-offset-2 hover:underline">
-              {showAll ? "Show less" : "Show all"}
+              {showAll ? t("Show less") : t("Show all")}
             </button>
           )}
         </div>

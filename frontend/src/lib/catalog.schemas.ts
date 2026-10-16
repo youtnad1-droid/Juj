@@ -3,11 +3,12 @@ import { z } from "zod";
 export const sortSchema = z.enum(["popular", "price_asc", "price_desc", "newest"]);
 export type OfferSort = z.infer<typeof sortSchema>;
 
-const slug = z.string().trim().min(1).max(80).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+export const slug = z.string().trim().min(1).max(80).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+const uuid = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
 
 export const listOffersSchema = z.object({
   categorySlug: slug.optional(),
-  sellerId: z.string().uuid().optional(),
+  sellerId: uuid.optional(),
   q: z.string().trim().max(100).optional(),
   sort: sortSchema.default("popular"),
   cursor: z.string().max(200).optional(),
@@ -16,8 +17,9 @@ export const listOffersSchema = z.object({
 export type ListOffersInput = z.input<typeof listOffersSchema>;
 
 export const offerIdSchema = z.object({ id: z.number().int().positive() });
-export const sellerIdSchema = z.object({ id: z.string().uuid() });
+export const sellerIdSchema = z.object({ id: uuid });
 export const categorySlugSchema = z.object({ slug });
+export const uuidSchema = uuid;
 
 export const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(254),
@@ -34,6 +36,23 @@ export const passwordSchema = z
 export const registerSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(254),
   password: passwordSchema,
+});
+
+export const providerSchema = z.enum(["stripe", "paypal", "razorpay", "crypto"]);
+
+export const checkoutSchema = z.object({
+  offerId: z.number().int().positive(),
+  optionId: uuid.optional(),
+  quantity: z.number().int().min(1).max(10).default(1),
+  inputs: z.record(z.string().max(40), z.string().max(200)).default({}),
+  provider: providerSchema,
+});
+export type CheckoutInput = z.input<typeof checkoutSchema>;
+
+export const reviewSchema = z.object({
+  orderId: z.number().int().positive(),
+  rating: z.number().int().min(1).max(5),
+  comment: z.string().trim().max(1000).default(""),
 });
 
 export type OfferCardDTO = {

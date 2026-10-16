@@ -1,9 +1,10 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
-import { fetchOffers } from "./catalog.functions";
+import { fetchFavorites, fetchOffers } from "./catalog.functions";
 import type { CategoryNode, OfferSort } from "./catalog.schemas";
-import { supabase } from "@/integrations/supabase/client";
-import type { OfferCardDTO } from "./catalog.schemas";
+import type { SessionUser } from "./auth.server";
+import type { Locale } from "@/i18n/locales";
 
+export type RootData = { tree: CategoryNode[]; session: { user: SessionUser | null; locale: Locale } };
 export type OfferFilter = { categorySlug?: string | undefined; sellerId?: string; q?: string; sort?: OfferSort };
 
 export const offersInfiniteQuery = (f: OfferFilter) =>
@@ -15,18 +16,7 @@ export const offersInfiniteQuery = (f: OfferFilter) =>
   });
 
 export const favoritesQuery = (userId: string | undefined) =>
-  queryOptions({
-    queryKey: ["favorites", userId],
-    enabled: !!userId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("favorites")
-        .select("created_at, offer:offers(id, slug, title, image_url, price_minor, old_price_minor, currency, sales_count)")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data.map((f) => f.offer).filter(Boolean) as OfferCardDTO[];
-    },
-  });
+  queryOptions({ queryKey: ["favorites", userId], enabled: !!userId, queryFn: () => fetchFavorites() });
 
 export function flatten(tree: CategoryNode[]): CategoryNode[] {
   return tree.flatMap((n) => [n, ...flatten(n.children)]);

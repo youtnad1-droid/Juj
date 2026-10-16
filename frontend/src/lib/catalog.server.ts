@@ -1,37 +1,19 @@
 // Server-only data access for the storefront. Shared by server functions (UI) and REST routes.
-import { createClient } from "@supabase/supabase-js";
-import type { Database } from "@/integrations/supabase/types";
-import {
-  listOffersSchema,
-  type CategoryNode,
-  type ListOffersInput,
-  type OfferCardDTO,
-} from "./catalog.schemas";
+import { exec, one, rows } from "./db.server";
+import type { Locale } from "@/i18n/locales";
+import { listOffersSchema, type CategoryNode, type ListOffersInput, type OfferCardDTO } from "./catalog.schemas";
 
-export function publicClient() {
-  const url = process.env["SUPABASE_URL"]!;
-  const key = process.env["SUPABASE_PUBLISHABLE_KEY"]!;
-  return createClient<Database>(url, key, {
-    auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
-    global: {
-      fetch: (input, init) => {
-        const h = new Headers(init?.headers);
-        if (key.startsWith("sb_") && h.get("Authorization") === `Bearer ${key}`) h.delete("Authorization");
-        h.set("apikey", key);
-        return fetch(input, { ...init, headers: h });
-      },
-    },
-  });
-}
+const tr = (alias: string, type: "offer" | "category", idExpr: string) =>
+  `LEFT JOIN content_translations ${alias} ON ${alias}.entity_type = '${type}' AND ${alias}.entity_id = ${idExpr} AND ${alias}.locale = ?`;
+export const OFFER_TR = tr("t", "offer", "CAST(o.id AS CHAR)");
+const CARD = "o.id, o.slug, COALESCE(t.title, o.title) AS title, o.image_url, o.price_minor, o.old_price_minor, o.currency, o.sales_count";
 
-const CARD_COLS = "id, slug, title, image_url, price_minor, old_price_minor, currency, sales_count";
-
-export async function getCategoryTree(): Promise<CategoryNode[]> {
-  const { data, error } = await publicClient()
-    .from("categories")
-    .select("id, parent_id, slug, name, icon, seo_text, sort_order, show_in_header")
-    .order("sort_order");
-  if (error) throw new Error("Failed to load categories");
+export async function getCategoryTree(locale: Locale): Promise<CategoryNode[]> {
+  const data = await rows<Omit<CategoryNode, "children">>(
+    `SELECT c.id, c.parent_id, c.slug, COALESCE(t.title, c.name) AS name, c.icon, COALESCE(t.description, c.seo_text) AS seo_text,
+       c.sort_order, c.show_in_header FROM categories c ${tr("t", "category", "c.id")} WHERE c.is_active = 1 ORDER BY c.sort_order`,
+    [locale],
+  );
   const nodes = new Map<string, CategoryNode>();
   for (const c of data) nodes.set(c.id, { ...c, children: [] });
   const roots: CategoryNode[] = [];
@@ -48,8 +30,7 @@ export function flattenTree(tree: CategoryNode[]): CategoryNode[] {
 }
 
 export function categoryPath(tree: CategoryNode[], id: string): CategoryNode[] {
-  const all = flattenTree(tree);
-  const byId = new Map(all.map((n) => [n.id, n]));
+  const byId = new Map(flattenTree(tree).map((n) => [n.id, n]));
   const path: CategoryNode[] = [];
   let cur = byId.get(id);
   while (cur) {
@@ -57,6 +38,11 @@ export function categoryPath(tree: CategoryNode[], id: string): CategoryNode[] {
     cur = cur.parent_id ? byId.get(cur.parent_id) : undefined;
   }
   return path;
+}
+
+function subtreeIds(tree: CategoryNode[], slugValue: string) {
+  const node = flattenTree(tree).find((n) => n.slug === slugValue);
+  return node ? flattenTree([node]).map((n) => n.id) : null;
 }
 
 type Cursor = { v: number; id: number };
@@ -72,112 +58,124 @@ function decodeCursor(s?: string): Cursor | null {
   return null;
 }
 
-export async function listOffers(raw: ListOffersInput) {
+export async function listOffers(raw: ListOffersInput, locale: Locale) {
   const input = listOffersSchema.parse(raw);
-  const sb = publicClient();
-  let query = sb.from("offers").select(CARD_COLS).eq("status", "active");
-
+  const where = ["o.status = 'active'"];
+  const params: unknown[] = [locale];
   if (input.categorySlug) {
-    const { data: cat } = await sb.from("categories").select("id").eq("slug", input.categorySlug).maybeSingle();
-    if (!cat) return { items: [] as OfferCardDTO[], nextCursor: null };
-    const { data: ids } = await sb.rpc("category_subtree", { _root: cat.id });
-    query = query.in("category_id", (ids ?? []) as string[]);
+    const ids = subtreeIds(await getCategoryTree(locale), input.categorySlug);
+    if (!ids?.length) return { items: [] as OfferCardDTO[], nextCursor: null };
+    where.push("o.category_id IN (?)");
+    params.push(ids);
   }
-  if (input.sellerId) query = query.eq("seller_id", input.sellerId);
-  if (input.q) {
-    const term = input.q.replace(/[%_,()\\]/g, " ").trim();
-    if (term) query = query.ilike("title", `%${term}%`);
+  if (input.sellerId) {
+    where.push("o.seller_id = ?");
+    params.push(input.sellerId);
   }
-
+  const term = input.q?.replace(/[%_\\]/g, " ").trim();
+  if (term) {
+    where.push("(o.title LIKE ? OR t.title LIKE ?)");
+    params.push(`%${term}%`, `%${term}%`);
+  }
   const c = decodeCursor(input.cursor);
+  let order: string;
   switch (input.sort) {
     case "price_asc":
-      if (c) query = query.or(`price_minor.gt.${c.v},and(price_minor.eq.${c.v},id.gt.${c.id})`);
-      query = query.order("price_minor", { ascending: true }).order("id", { ascending: true });
+      if (c) { where.push("(o.price_minor > ? OR (o.price_minor = ? AND o.id > ?))"); params.push(c.v, c.v, c.id); }
+      order = "o.price_minor ASC, o.id ASC";
       break;
     case "price_desc":
-      if (c) query = query.or(`price_minor.lt.${c.v},and(price_minor.eq.${c.v},id.lt.${c.id})`);
-      query = query.order("price_minor", { ascending: false }).order("id", { ascending: false });
+      if (c) { where.push("(o.price_minor < ? OR (o.price_minor = ? AND o.id < ?))"); params.push(c.v, c.v, c.id); }
+      order = "o.price_minor DESC, o.id DESC";
       break;
     case "newest":
-      if (c) query = query.lt("id", c.id);
-      query = query.order("id", { ascending: false });
+      if (c) { where.push("o.id < ?"); params.push(c.id); }
+      order = "o.id DESC";
       break;
     default:
-      if (c) query = query.or(`sales_count.lt.${c.v},and(sales_count.eq.${c.v},id.lt.${c.id})`);
-      query = query.order("sales_count", { ascending: false }).order("id", { ascending: false });
+      if (c) { where.push("(o.sales_count < ? OR (o.sales_count = ? AND o.id < ?))"); params.push(c.v, c.v, c.id); }
+      order = "o.sales_count DESC, o.id DESC";
   }
-
-  const { data, error } = await query.limit(input.limit + 1);
-  if (error) throw new Error("Failed to load offers");
+  params.push(input.limit + 1);
+  const data = await rows<OfferCardDTO>(
+    `SELECT ${CARD} FROM offers o ${OFFER_TR} WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT ?`, params);
   const hasMore = data.length > input.limit;
-  const items = data.slice(0, input.limit) as OfferCardDTO[];
+  const items = data.slice(0, input.limit);
   const last = items[items.length - 1];
-  const sortVal = (o: OfferCardDTO) =>
-    input.sort === "popular" ? o.sales_count : input.sort === "newest" ? o.id : o.price_minor;
+  const sortVal = (o: OfferCardDTO) => (input.sort === "popular" ? o.sales_count : input.sort === "newest" ? o.id : o.price_minor);
   return { items, nextCursor: hasMore && last ? encodeCursor({ v: sortVal(last), id: last.id }) : null };
 }
 
-export async function countOffers(categorySlug?: string) {
-  const sb = publicClient();
-  let q = sb.from("offers").select("id", { count: "exact", head: true }).eq("status", "active");
-  if (categorySlug) {
-    const { data: cat } = await sb.from("categories").select("id").eq("slug", categorySlug).maybeSingle();
-    if (!cat) return 0;
-    const { data: ids } = await sb.rpc("category_subtree", { _root: cat.id });
-    q = q.in("category_id", (ids ?? []) as string[]);
-  }
-  const { count } = await q;
-  return count ?? 0;
-}
-
-export async function getCategoryBySlug(slug: string) {
-  const tree = await getCategoryTree();
-  const node = flattenTree(tree).find((n) => n.slug === slug);
+export async function getCategoryBySlug(slugValue: string, locale: Locale) {
+  const tree = await getCategoryTree(locale);
+  const node = flattenTree(tree).find((n) => n.slug === slugValue);
   if (!node) return null;
-  const [count] = await Promise.all([countOffers(slug)]);
-  return { category: node, path: categoryPath(tree, node.id), offerCount: count };
+  const ids = flattenTree([node]).map((n) => n.id);
+  const count = await one<{ n: number }>("SELECT COUNT(*) n FROM offers WHERE status = 'active' AND category_id IN (?)", [ids]);
+  return { category: node, path: categoryPath(tree, node.id), offerCount: count?.n ?? 0 };
 }
 
-export async function getOffer(id: number) {
-  const sb = publicClient();
-  const { data: offer } = await sb
-    .from("offers")
-    .select(
-      "id, slug, title, description, image_url, price_minor, old_price_minor, currency, delivery_type, stock_count, sales_count, region, platform, category_id, seller_id, created_at",
-    )
-    .eq("id", id)
-    .eq("status", "active")
-    .maybeSingle();
+type FieldRow = { id: string; key: string; label: string; type: "text" | "select" | "number"; select_options: string | null; required: boolean; sort_order: number };
+
+export async function getOffer(id: number, locale: Locale) {
+  const offer = await one<{
+    id: number; slug: string; title: string; description: string; image_url: string | null; price_minor: number;
+    old_price_minor: number | null; currency: string; delivery_type: "auto_codes" | "manual"; stock_count: number;
+    sales_count: number; region: string | null; platform: string | null; category_id: string; seller_id: string; created_at: Date;
+  }>(
+    `SELECT o.id, o.slug, COALESCE(t.title, o.title) AS title, COALESCE(t.description, o.description) AS description, o.image_url,
+       o.price_minor, o.old_price_minor, o.currency, o.delivery_type, o.stock_count, o.sales_count, o.region, o.platform,
+       o.category_id, o.seller_id, o.created_at FROM offers o ${OFFER_TR} WHERE o.id = ? AND o.status = 'active'`,
+    [locale, id],
+  );
   if (!offer) return null;
   const [options, fields, seller, tree] = await Promise.all([
-    sb.from("offer_options").select("id, label, price_minor, sort_order").eq("offer_id", id).order("sort_order"),
-    sb
-      .from("offer_input_fields")
-      .select("id, key, label, type, select_options, required, sort_order")
-      .eq("offer_id", id)
-      .order("sort_order"),
-    sb
-      .from("seller_profiles")
-      .select("user_id, display_name, rating_avg, rating_count, sales_count, verification_status")
-      .eq("user_id", offer.seller_id)
-      .maybeSingle(),
-    getCategoryTree(),
+    rows<{ id: string; label: string; price_minor: number; sort_order: number }>(
+      "SELECT id, label, price_minor, sort_order FROM offer_options WHERE offer_id = ? ORDER BY sort_order", [id]),
+    rows<FieldRow>(
+      "SELECT id, field_key AS `key`, label, type, select_options, required, sort_order FROM offer_input_fields WHERE offer_id = ? ORDER BY sort_order", [id]),
+    getSeller(offer.seller_id),
+    getCategoryTree(locale),
   ]);
   return {
     offer,
-    options: options.data ?? [],
-    fields: (fields.data ?? []).filter((f) => f.type !== "password"),
-    seller: seller.data,
+    options,
+    fields: fields.map((f) => ({ ...f, select_options: f.select_options ? (JSON.parse(f.select_options) as string[]) : [] })),
+    seller,
     categoryPath: categoryPath(tree, offer.category_id).map(({ children: _c, ...n }) => n),
   };
 }
 
 export async function getSeller(id: string) {
-  const { data } = await publicClient()
-    .from("seller_profiles")
-    .select("user_id, display_name, bio, country, verification_status, rating_avg, rating_count, sales_count, created_at")
-    .eq("user_id", id)
-    .maybeSingle();
-  return data;
+  return one<{
+    user_id: string; display_name: string; bio: string | null; country: string | null; verification_status: string;
+    rating_avg: number; rating_count: number; sales_count: number; created_at: Date;
+  }>(
+    "SELECT user_id, display_name, bio, country, verification_status, rating_avg, rating_count, sales_count, created_at FROM seller_profiles WHERE user_id = ?",
+    [id],
+  );
+}
+
+export const maskEmail = (e: string) => `${e.slice(0, 2)}***`;
+
+export async function getSellerReviews(sellerId: string, locale: Locale, limit = 20) {
+  const data = await rows<{ id: number; rating: number; comment: string | null; seller_reply: string | null; created_at: Date; email: string; offer_title: string }>(
+    `SELECT r.id, r.rating, r.comment, r.seller_reply, r.created_at, u.email, COALESCE(t.title, o.title) AS offer_title
+     FROM reviews r JOIN users u ON u.id = r.buyer_id JOIN offers o ON o.id = r.offer_id ${OFFER_TR}
+     WHERE r.seller_id = ? AND r.status = 'visible' ORDER BY r.id DESC LIMIT ?`,
+    [locale, sellerId, limit],
+  );
+  return data.map(({ email, ...r }) => ({ ...r, buyer: maskEmail(email) }));
+}
+
+export async function listFavorites(userId: string, locale: Locale) {
+  return rows<OfferCardDTO>(
+    `SELECT ${CARD} FROM favorites f JOIN offers o ON o.id = f.offer_id ${OFFER_TR} WHERE f.user_id = ? ORDER BY f.created_at DESC`,
+    [locale, userId],
+  );
+}
+
+export async function setFavorite(userId: string, offerId: number, on: boolean) {
+  if (on) await exec("INSERT IGNORE INTO favorites (user_id, offer_id) SELECT ?, id FROM offers WHERE id = ? AND status = 'active'", [userId, offerId]);
+  else await exec("DELETE FROM favorites WHERE user_id = ? AND offer_id = ?", [userId, offerId]);
 }

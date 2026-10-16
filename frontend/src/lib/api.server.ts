@@ -1,6 +1,6 @@
-import { createClient } from "@supabase/supabase-js";
-import type { Database } from "@/integrations/supabase/types";
 import { ZodError } from "zod";
+import { loadUser, verifyToken } from "./auth.server";
+import { LOCALE_COOKIE, isLocale, type Locale } from "@/i18n/locales";
 
 export const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   Response.json(body, { status, headers });
@@ -11,16 +11,18 @@ export function handleError(e: unknown) {
   return json({ error: "server_error" }, 500);
 }
 
-/** Returns a user-scoped client (RLS applies) and user id, or null when the bearer is missing/invalid. */
-export async function authFromRequest(request: Request) {
-  const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!token) return null;
-  const key = process.env["SUPABASE_PUBLISHABLE_KEY"]!;
-  const sb = createClient<Database>(process.env["SUPABASE_URL"]!, key, {
-    auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: `Bearer ${token}`, apikey: key } },
-  });
-  const { data, error } = await sb.auth.getUser(token);
-  if (error || !data.user) return null;
-  return { sb, userId: data.user.id };
+const cookie = (request: Request, name: string) =>
+  new RegExp(`(?:^|;\\s*)${name}=([^;]+)`).exec(request.headers.get("cookie") ?? "")?.[1];
+
+/** User from `Authorization: Bearer <access_token>` or the session cookie. */
+export async function userFromRequest(request: Request) {
+  const bearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  const id = await verifyToken(bearer || cookie(request, "juj_at"), "access");
+  return id ? loadUser(id) : null;
+}
+
+export function localeFrom(request: Request): Locale {
+  const q = new URL(request.url).searchParams.get("locale");
+  const c = q ?? cookie(request, LOCALE_COOKIE);
+  return isLocale(c) ? c : "en";
 }

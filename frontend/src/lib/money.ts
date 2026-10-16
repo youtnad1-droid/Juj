@@ -21,3 +21,10 @@ export function parseOfferParam(param: string): number | null {
   const id = Number(m[1]);
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
+
+export const fmtDate = (d: Date | string | null | undefined, locale: string, time = false) =>
+  d ? new Date(d).toLocaleString(locale, time ? { dateStyle: "medium", timeStyle: "short" } : { dateStyle: "medium" }) : "—";
+
+/** "12.50" -> 1250 cents; returns NaN for bad input. */
+export const toMinor = (v: string) => (/^\d+(\.\d{1,2})?$/.test(v.trim()) ? Math.round(Number(v) * 100) : NaN);
+export const fromMinor = (n: number | null | undefined) => (n == null ? "" : (n / 100).toFixed(2));
