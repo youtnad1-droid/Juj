@@ -25,8 +25,11 @@ LOCALE_NAMES = {
     "zh": "Simplified Chinese", "ru": "Russian", "es": "Spanish", "en": "English",
 }
 SYSTEM = (
-    "You translate product listings for a digital goods marketplace. Keep brand names, "
-    "product names, numbers, currencies and codes unchanged. Return ONLY JSON: "
+    "You translate product listings for a digital goods marketplace. Translate ALL ordinary words, "
+    "including generic product words (e.g. 'Music streaming Premium', 'Antivirus Total Security 1 year', "
+    "'Indie game bundle', 'Limited', 'Instant') and labels such as 'Region:', 'Platform:', 'How to redeem:'. "
+    "Keep only real brand/trademark names (Roblox, PlayStation, Steam, Robux, Xbox), item proper names, numbers, "
+    "currencies and codes unchanged. Return ONLY JSON: "
     '{"<locale>": {"title": "...", "description": "..."}} for every requested locale.'
 )
 

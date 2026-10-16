@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 3 retest through the public URL (desktop 1920 and mobile 390). Both earlier CRITICAL issues are FIXED. (1) LOGOUT works: login sets one httpOnly+Secure 'juj_session' cookie. Logout deletes it, the Login button shows again, /orders and /admin redirect to /auth?redirect=..., and a reload keeps the user logged out. (2) i18n works: all 7 dictionaries have 333 keys and content_translations has 41 offers + 9 categories x 7 locales. fr/ar/ko/es/ru all translate the UI (nav, search placeholder, Buy now, BuyBox labels, 'Not set up', footer). Category names and offer descriptions are translated, ar sets dir=rtl with a mirrored layout, and the chosen locale survives a reload. A new seller offer was auto-translated into all 7 locales. All in-app ConfirmButton dialogs work, and no native browser dialogs fired: admin order Release / Refund / Cancel (each Cancel button closes the dialog with no change), category create/edit/delete, review delete (cancel tested), payout reject with a note (note saved, balance returned), the buyer's 'I received the item' (cancel, then confirm -> completed), and seller cabinet archive-offer. Review hide/show, seller verification and offer status are applied straight away without a dialog. They worked and saved; since they can be undone, that is acceptable. Money flow: checkout -> real Stripe test redirect -> signed webhook -> delivered. Seller pending was +295; after admin Release, balance went from 148 to 443 and pending to 0. After buyer confirm, balance went +148. Refund of a delivered order -> refunded. Cancel of a pending order -> cancelled. Regression OK: login for admin/seller/buyer, BuyBox (qty, option, PayPal/Razorpay/Crypto disabled with 'NOT SET UP'), seller create/edit offer (price saved as 275), payout request, reviews only on completed orders (the delivered order has no review-form), review posted. Mobile 390: search input is about 138px wide and readable; no horizontal overflow on home in en/ru. One overflow remains on the offer page in ru (details below). The offer grid error state with Retry exists (OfferCard.tsx: q.isError -> offers-error + Retry); checked by code review only.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "content_translations (offer titles)", "issue": "About 17-19 of 41 offer titles per locale are stored exactly the same as the English title. Some are brand names (fine), but others are plain English phrases: 'Music streaming Premium — Instant', 'Antivirus Total Security 1 year', 'Indie game bundle Steam key', 'Video streaming Standard plan — Instant', 'Limited: Golden Crown of O'Malley — Instant'. Elsewhere the '— Instant' suffix IS translated (ko '즉시', es 'Instantáneo'). Descriptions are translated, but parts stay English, e.g. 'Region: Global. Platform: PC / Mobile.' and 'How to redeem:' on es/ar offer pages."},
+      {"endpoint": "Session cookie attributes", "issue": "Code sets SameSite=lax, but the browser receives 'SameSite=None; Partitioned' through the public URL. This is most likely rewritten by the preview proxy, not the app. Info only: verify on production."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "BuyBox payment method tiles (mobile 390px, ru)", "issue": "The long 'НЕ НАСТРОЕНО' badge next to 'Криптовалюта' overflows the tile, so the page is 402px wide in a 390px viewport (horizontal scroll). en is fine. Fix: let the badge wrap or truncate (min-w-0, flex-wrap), or put the badge under the label on small screens.", "selector": "[data-testid=payment-method-crypto] span.text-[10px]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dev-mode hydration", "issues": ["On the first load of /auth (dev server), typing and clicking before hydration is lost: the fields clear and the click does nothing. Fine after about 8s. Production build should be fine; consider disabling the submit button until hydrated."]},
+      {"screen": "Toasts", "issues": ["Sonner toasts at top-right cover the Profile button for a few seconds after an action."]},
+      {"screen": "Post-login redirect", "issues": ["Admin and seller land on '/' after login rather than /admin or /cabinet (test_credentials.md suggests a role landing page). Optional."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_juj_payments_webhook.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Translate the remaining non-brand offer titles and the English fragments in descriptions (re-run the translation with a prompt that keeps only brand names).",
+    "Fix the BuyBox 'Not set up' badge overflow on mobile for long locales (ru).",
+    "Delete or rewrite the obsolete /app/backend/tests/test_api_v1.py. It targets the pre-migration /api/v1 REST endpoints on localhost:3000, which now return 404: 7 failures that are not app regressions."
+  ],
+  "critical_code_review_comments": [
+    "Admin review hide/show, seller verification select and offer status select change data immediately on click/change without confirmation. Acceptable because they can be undone, but a misclick on offer status 'archived' hides an offer at once.",
+    "ConfirmButton's AlertDialogAction closes before the async onConfirm finishes, so there is no busy state and double actions are possible. Minor.",
+    "en.json is {} (keys are the English strings). OK by design."
+  ],
+  "updated_files": ["/app/test_reports/iteration_3.json"],
+  "success_rate": {"backend": "100% (webhook/public tests in test_juj_payments_webhook.py; test_api_v1.py is obsolete)", "frontend": "97%"},
+  "test_credentials": "From /app/memory/test_credentials.md: all accounts use JujDemo2026!. bcrypt hashes start with $2b$.",
+  "seed_data_creation": "Orders #11 (completed via admin Release), #12 (completed via buyer confirm, review id 8 'TEST_ iter3 review', 5 stars), #13 (refunded), #14 (cancelled). Offer #42 'TEST_ iter3 offer' (KeyForge, archived). Payout #2 rejected (note 'TEST_ wrong iban'). Category test-cat3 was created and deleted. KeyForge balance is now 591 minor.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Dev server hydration is slow: after networkidle wait about 8s before typing on /auth, and after the page loads before clicking buy-button. To make a paid order: buyer clicks buy-button -> waits for checkout.stripe.com URL -> run 'cd /app/backend && set -a && . ../frontend/.env && set +a && python -m pytest tests/test_juj_payments_webhook.py -k pending' (it marks the newest pending stripe order as paid/delivered). pytest.ini adds xdist flags, so do not pass -p no:xdist. ConfirmButton testids: <id>, <id>-dialog, <id>-confirm, <id>-cancel, <id>-note."
+}

@@ -142,7 +142,7 @@ function RootComponent() {
             </main>
             <Footer />
           </div>
-          <Toaster position={localeDir(locale) === "rtl" ? "top-left" : "top-right"} />
+          <Toaster position={localeDir(locale) === "rtl" ? "bottom-left" : "bottom-right"} />
         </ThemeProvider>
       </I18nProvider>
     </QueryClientProvider>

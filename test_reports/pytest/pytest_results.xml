@@ -1,1 +1,55 @@
-<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="8" time="2.435" timestamp="2026-10-16T05:03:22.478226+00:00" hostname="agent-env-aade1089-8f96-44b2-8382-3bd0e3e374df"><testcase classname="tests.test_juj_payments_webhook" name="test_public_pages[/]" time="0.351" /><testcase classname="tests.test_juj_payments_webhook" name="test_public_pages[/auth]" time="0.137" /><testcase classname="tests.test_juj_payments_webhook" name="test_public_pages[/catalog/roblox]" time="0.171" /><testcase classname="tests.test_juj_payments_webhook" name="test_public_pages[/search?q=roblox]" time="0.218" /><testcase classname="tests.test_juj_payments_webhook" name="test_public_pages[/catalog/product/roblox-gift-card-robux-code-1]" time="0.168" /><testcase classname="tests.test_juj_payments_webhook" name="test_offer_ssr_title" time="0.160" /><testcase classname="tests.test_juj_payments_webhook" name="test_webhook_rejects_bad_signature" time="0.210" /><testcase classname="tests.test_juj_payments_webhook" name="test_webhook_marks_pending_order_paid" time="0.326" /></testsuite></testsuites>
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="7" skipped="1" tests="15" time="2.453" timestamp="2026-10-16T05:30:39.175679+00:00" hostname="agent-env-aade1089-8f96-44b2-8382-3bd0e3e374df"><testcase classname="tests.test_api_v1.TestOffers" name="test_list_offers" time="0.068"><failure message="assert 404 == 200&#10; +  where 404 = &lt;Response [404]&gt;.status_code">backend/tests/test_api_v1.py:35: in test_list_offers
+    assert r.status_code == 200
+E   assert 404 == 200
+E    +  where 404 = &lt;Response [404]&gt;.status_code</failure></testcase><testcase classname="tests.test_juj_payments_webhook" name="test_public_pages[/]" time="0.382" /><testcase classname="tests.test_api_v1.TestOffers" name="test_offers_pagination_cursor" time="0.021"><failure message="assert 404 == 200&#10; +  where 404 = &lt;Response [404]&gt;.status_code">backend/tests/test_api_v1.py:45: in test_offers_pagination_cursor
+    assert r.status_code == 200
+E   assert 404 == 200
+E    +  where 404 = &lt;Response [404]&gt;.status_code</failure></testcase><testcase classname="tests.test_api_v1.TestOffers" name="test_offer_detail" time="0.059"><failure message="requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)">/root/.venv/lib/python3.11/site-packages/requests/models.py:1116: in json
+    return complexjson.loads(self.text, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/decoder.py:337: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/decoder.py:355: in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+E   json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+backend/tests/test_api_v1.py:52: in test_offer_detail
+    oid = r.json()["items"][0]["id"]
+          ^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/models.py:1120: in json
+    raise RequestsJSONDecodeError(e.msg, e.doc, e.pos)
+E   requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)</failure></testcase><testcase classname="tests.test_api_v1.TestCategories" name="test_categories_local" time="0.020"><failure message="assert 404 == 200&#10; +  where 404 = &lt;Response [404]&gt;.status_code">backend/tests/test_api_v1.py:16: in test_categories_local
+    assert r.status_code == 200
+E   assert 404 == 200
+E    +  where 404 = &lt;Response [404]&gt;.status_code</failure></testcase><testcase classname="tests.test_api_v1.TestCategories" name="test_categories_external_routing" time="0.219"><failure message="AssertionError: External /api/v1 returns 404 - ingress routes to unused FastAPI&#10;assert 404 == 200&#10; +  where 404 = &lt;Response [404]&gt;.status_code">backend/tests/test_api_v1.py:29: in test_categories_external_routing
+    assert r.status_code == 200, f"External /api/v1 returns {r.status_code} - ingress routes to unused FastAPI"
+E   AssertionError: External /api/v1 returns 404 - ingress routes to unused FastAPI
+E   assert 404 == 200
+E    +  where 404 = &lt;Response [404]&gt;.status_code</failure></testcase><testcase classname="tests.test_juj_payments_webhook" name="test_public_pages[/auth]" time="0.426" /><testcase classname="tests.test_api_v1.TestSellers" name="test_seller_detail" time="0.027"><failure message="requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)">/root/.venv/lib/python3.11/site-packages/requests/models.py:1116: in json
+    return complexjson.loads(self.text, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/decoder.py:337: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/decoder.py:355: in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+E   json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+backend/tests/test_api_v1.py:65: in test_seller_detail
+    offer = r.json()["items"][0]
+            ^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/models.py:1120: in json
+    raise RequestsJSONDecodeError(e.msg, e.doc, e.pos)
+E   requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)</failure></testcase><testcase classname="tests.test_api_v1.TestSearch" name="test_search_robux" time="0.020"><failure message="assert 404 == 200&#10; +  where 404 = &lt;Response [404]&gt;.status_code">backend/tests/test_api_v1.py:82: in test_search_robux
+    assert r.status_code == 200
+E   assert 404 == 200
+E    +  where 404 = &lt;Response [404]&gt;.status_code</failure></testcase><testcase classname="tests.test_juj_payments_webhook" name="test_public_pages[/catalog/roblox]" time="0.252" /><testcase classname="tests.test_juj_payments_webhook" name="test_public_pages[/search?q=roblox]" time="0.179" /><testcase classname="tests.test_juj_payments_webhook" name="test_public_pages[/catalog/product/roblox-gift-card-robux-code-1]" time="0.366" /><testcase classname="tests.test_juj_payments_webhook" name="test_offer_ssr_title" time="0.187" /><testcase classname="tests.test_juj_payments_webhook" name="test_webhook_rejects_bad_signature" time="0.144" /><testcase classname="tests.test_juj_payments_webhook" name="test_webhook_marks_pending_order_paid" time="0.011"><skipped type="pytest.skip" message="no pending stripe order">/app/backend/tests/test_juj_payments_webhook.py:52: no pending stripe order</skipped></testcase></testsuite></testsuites>

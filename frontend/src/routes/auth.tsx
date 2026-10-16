@@ -47,7 +47,8 @@ function AuthPage() {
     }
     await refresh();
     setBusy(false);
-    navigate({ href: safe(redirect) });
+    const home = r.role === "admin" ? "/admin" : r.role === "seller" ? "/cabinet" : "/";
+    navigate({ href: redirect ? safe(redirect) : home });
   };
 
   const onRegister = async (e: React.FormEvent<HTMLFormElement>) => {

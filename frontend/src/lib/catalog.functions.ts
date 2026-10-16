@@ -46,7 +46,7 @@ export const loginFn = createServerFn({ method: "POST" })
     const r = await auth.login(data, auth.clientIp(getRequest()));
     if (!r.ok) return r;
     await auth.startSession(r.userId);
-    return { ok: true as const };
+    return { ok: true as const, role: (await auth.loadUser(r.userId))?.role ?? "buyer" };
   });
 
 export const registerFn = createServerFn({ method: "POST" })

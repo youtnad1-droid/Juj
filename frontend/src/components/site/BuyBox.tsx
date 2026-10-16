@@ -114,8 +114,10 @@ export function BuyBox({ data }: { data: OfferData }) {
                 className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-start text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${provider === m.id ? "border-primary bg-accent font-semibold" : "hover:border-primary"}`}
               >
                 <M.icon className="h-4 w-4 shrink-0" />
-                <span className="flex-1">{M.label}</span>
-                {!m.available && <span className="text-[10px] uppercase text-muted-foreground">{t("Not set up")}</span>}
+                <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
+                  <span className="truncate">{M.label}</span>
+                  {!m.available && <span className="text-[10px] uppercase leading-tight text-muted-foreground">{t("Not set up")}</span>}
+                </span>
               </button>
             );
           })}
