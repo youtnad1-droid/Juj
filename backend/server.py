@@ -43,8 +43,8 @@ class TranslateRequest(BaseModel):
 
 
 def parse_json(text: str) -> dict:
-    m = re.search(r"\{.*\}", text, re.S)
-    return json.loads(m.group(0)) if m else {}
+    start = text.find("{")
+    return json.JSONDecoder().raw_decode(text[start:])[0] if start >= 0 else {}
 
 
 async def translate_one(item: TranslateItem, locales: list[str]) -> dict:
@@ -53,7 +53,13 @@ async def translate_one(item: TranslateItem, locales: list[str]) -> dict:
     ).with_model("openai", "gpt-5.4-mini")
     payload = {"title": item.title, "description": item.description,
                "locales": {l: LOCALE_NAMES[l] for l in locales if l in LOCALE_NAMES}}
-    data = parse_json(await chat.send_message(UserMessage(text=json.dumps(payload, ensure_ascii=False))))
+    data = {}
+    for _ in range(3):
+        try:
+            data = parse_json(await chat.send_message(UserMessage(text=json.dumps(payload, ensure_ascii=False))))
+            break
+        except ValueError:
+            continue
     return {l: v for l, v in data.items() if l in payload["locales"] and isinstance(v, dict)}
 
 

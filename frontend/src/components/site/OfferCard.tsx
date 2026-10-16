@@ -51,6 +51,7 @@ export function OfferGrid({ filter }: { filter: OfferFilter }) {
   const { t } = useI18n();
   const q = useInfiniteQuery(offersInfiniteQuery(filter));
   const items = q.data?.pages.flatMap((p) => p.items) ?? [];
+  if (q.isError) return <div className="py-16 text-center text-destructive" data-testid="offers-error">{t("Could not load offers. Please try again.")} <Button variant="link" onClick={() => q.refetch()}>{t("Retry")}</Button></div>;
   if (q.isPending) return <div className="py-16 text-center text-muted-foreground">{t("Loading offers…")}</div>;
   if (!items.length) return <div className="py-16 text-center text-muted-foreground" data-testid="no-offers">{t("No offers found.")}</div>;
   return (

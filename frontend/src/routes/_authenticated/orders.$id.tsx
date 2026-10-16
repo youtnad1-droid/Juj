@@ -1,5 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ConfirmButton } from "@/components/site/ConfirmButton";
 import { useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -150,9 +151,9 @@ function Actions({ d }: { d: Detail }) {
         })}>{t("Pay now")}</Button>
       )}
       {d.can.confirm && (
-        <Button className="w-full" disabled={busy} data-testid="order-confirm-button" onClick={() => run(() => confirmReceivedFn({ data: { orderId: id } }), t("Thanks! The order is completed."))}>
+        <ConfirmButton variant="default" className="h-10 w-full" disabled={busy} testId="order-confirm-button" question={t("Did you receive the item? The payment will be released to the seller.")} onConfirm={() => run(() => confirmReceivedFn({ data: { orderId: id } }), t("Thanks! The order is completed."))}>
           <CheckCircle2 className="h-4 w-4" /> {t("I received the item")}
-        </Button>
+        </ConfirmButton>
       )}
       {d.can.dispute && !disputing && (
         <Button variant="outline" className="w-full" data-testid="order-dispute-button" onClick={() => setDisputing(true)}>

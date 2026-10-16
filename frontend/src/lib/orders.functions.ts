@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { checkoutSchema, type CheckoutInput } from "./catalog.schemas";
+import { checkoutSchema, reviewSchema, type CheckoutInput } from "./catalog.schemas";
 import * as orders from "./orders.server";
 import { requireUser } from "./auth.server";
 
@@ -52,7 +52,7 @@ export const disputeFn = createServerFn({ method: "POST" })
   });
 
 export const reviewFn = createServerFn({ method: "POST" })
-  .validator((d: { orderId: number; rating: number; comment: string }) => d)
+  .validator((d: { orderId: number; rating: number; comment: string }) => reviewSchema.parse(d))
   .handler(async ({ data }) => {
     await orders.leaveReview(await requireUser(), data);
     return { ok: true };

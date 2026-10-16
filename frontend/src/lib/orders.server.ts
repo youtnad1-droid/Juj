@@ -271,7 +271,8 @@ export async function confirmReceived(user: SessionUser, orderId: number) {
 export async function openDispute(user: SessionUser, orderId: number, reason: string) {
   const d = await orderFor(user, orderId);
   if (!d.can.dispute) throw new Error(m("You can't open a dispute for this order."));
-  await exec("UPDATE orders SET status = 'disputed' WHERE id = ?", [orderId]);
+  const r = await exec("UPDATE orders SET status = 'disputed' WHERE id = ? AND status IN ('paid', 'delivered')", [orderId]);
+  if (r.affectedRows !== 1) throw new Error(m("You can't open a dispute for this order."));
   await exec("INSERT INTO order_messages (order_id, sender_id, kind, body) VALUES (?, ?, 'message', ?)", [orderId, user.id, reason]);
   await sysMsg(orderId, m("The buyer opened a dispute. The platform team will review this order."));
   const seller = await emailOf(d.order.seller_id);

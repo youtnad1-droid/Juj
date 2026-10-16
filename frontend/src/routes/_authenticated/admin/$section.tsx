@@ -9,6 +9,7 @@ import { fmtDate, formatPrice } from "@/lib/money";
 import { PageTitle, selectCls } from "@/components/site/PanelLayout";
 import { StatusBadge, orderStatusLabel } from "@/components/site/StatusBadge";
 import { Stars } from "@/components/site/Stars";
+import { ConfirmButton } from "@/components/site/ConfirmButton";
 import { useI18n } from "@/i18n";
 
 const SECTIONS = ["orders", "users", "offers", "categories", "reviews", "payouts", "settings"] as const;
@@ -75,17 +76,17 @@ function Orders() {
 function OrderActions({ id, status }: { id: number; status: string }) {
   const { t } = useI18n();
   const run = useRun(["admin-orders", "admin-stats"]);
-  const act = (action: "refund" | "release" | "cancel", q: string) => confirm(q) && run(() => A.resolveOrderFn({ data: { id, action } }));
+  const act = (action: "refund" | "release" | "cancel") => run(() => A.resolveOrderFn({ data: { id, action } }));
   return (
     <span className="flex gap-1">
       {["paid", "delivered", "disputed"].includes(status) && (
         <>
-          <Button size="sm" variant="outline" data-testid={`admin-order-release-${id}`} onClick={() => act("release", t("Complete this order and pay the seller?"))}>{t("Release")}</Button>
-          <Button size="sm" variant="ghost" data-testid={`admin-order-refund-${id}`} onClick={() => act("refund", t("Refund this order to the buyer?"))}>{t("Refund")}</Button>
+          <ConfirmButton variant="outline" testId={`admin-order-release-${id}`} question={t("Complete this order and pay the seller?")} onConfirm={() => act("release")}>{t("Release")}</ConfirmButton>
+          <ConfirmButton testId={`admin-order-refund-${id}`} question={t("Refund this order to the buyer?")} onConfirm={() => act("refund")}>{t("Refund")}</ConfirmButton>
         </>
       )}
       {status === "pending_payment" && (
-        <Button size="sm" variant="ghost" data-testid={`admin-order-cancel-${id}`} onClick={() => act("cancel", t("Cancel this unpaid order?"))}>{t("Cancel")}</Button>
+        <ConfirmButton testId={`admin-order-cancel-${id}`} question={t("Cancel this unpaid order?")} onConfirm={() => act("cancel")}>{t("Cancel")}</ConfirmButton>
       )}
     </span>
   );
@@ -106,7 +107,7 @@ function Users() {
             <Link to="/seller/$id" params={{ id: s.user_id }} className="font-semibold underline">{s.display_name}</Link>
             <span className="flex-1 text-muted-foreground">{s.email} · {s.offers} {t("Offers")} · ★ {Number(s.rating_avg).toFixed(2)}</span>
             <span>{t("Balance")}: {formatPrice(s.balance_minor)} · {t("On hold")}: {formatPrice(s.pending_minor)}</span>
-            <select className={selectCls} value={s.verification_status} onChange={(e) => run(() => A.setSellerVerificationFn({ data: { id: s.user_id, status: e.target.value } }))}>
+            <select className={selectCls} value={s.verification_status} data-testid={`admin-seller-verify-${s.user_id}`} onChange={(e) => run(() => A.setSellerVerificationFn({ data: { id: s.user_id, status: e.target.value } }))}>
               {["unverified", "pending", "verified", "rejected"].map((v) => <option key={v} value={v}>{orderStatusLabel(t, v)}</option>)}
             </select>
           </Row>
@@ -145,7 +146,7 @@ function Offers() {
           <Row key={o.id} id={`admin-offer-${o.id}`}>
             <span className="min-w-0 flex-1 truncate"><b>{o.title}</b> · {o.seller} · {o.category}</span>
             <span>{formatPrice(o.price_minor, o.currency)} · {t("Stock")} {o.stock_count}</span>
-            <select className={selectCls} value={o.status} onChange={(e) => run(() => A.setOfferStatusFn({ data: { id: o.id, status: e.target.value } }))}>
+            <select className={selectCls} value={o.status} data-testid={`admin-offer-status-${o.id}`} onChange={(e) => run(() => A.setOfferStatusFn({ data: { id: o.id, status: e.target.value } }))}>
               {["active", "paused", "draft", "archived"].map((s) => <option key={s} value={s}>{orderStatusLabel(t, s)}</option>)}
             </select>
           </Row>
@@ -189,8 +190,8 @@ function Categories() {
           <Row key={c.id} id={`admin-category-${c.slug}`}>
             <span className="flex-1"><b>{c.name}</b> <span className="text-muted-foreground">/{c.slug} · {name(c.parent_id)} · {c.commission_percent}% · {c.offers} {t("Offers")}</span></span>
             {!c.is_active && <StatusBadge status="hidden" />}
-            <Button size="sm" variant="outline" onClick={() => edit(c)}>{t("Edit")}</Button>
-            <Button size="sm" variant="ghost" onClick={() => confirm(t("Delete this category?")) && run(() => A.deleteCategoryFn({ data: { id: c.id } }))}>{t("Delete")}</Button>
+            <Button size="sm" variant="outline" data-testid={`admin-category-edit-${c.slug}`} onClick={() => edit(c)}>{t("Edit")}</Button>
+            <ConfirmButton testId={`admin-category-delete-${c.slug}`} question={t("Delete this category?")} onConfirm={() => run(() => A.deleteCategoryFn({ data: { id: c.id } }))}>{t("Delete")}</ConfirmButton>
           </Row>
         ))}
       </List>
@@ -209,8 +210,8 @@ function Reviews() {
           <Stars value={r.rating} />
           <span className="min-w-0 flex-1">{r.comment ?? "—"} <span className="text-xs text-muted-foreground">· {r.buyer} → {r.seller} · {fmtDate(r.created_at, locale)}</span></span>
           <StatusBadge status={r.status} />
-          <Button size="sm" variant="outline" onClick={() => run(() => A.setReviewStatusFn({ data: { id: r.id, status: r.status === "visible" ? "hidden" : "visible" } }))}>{r.status === "visible" ? t("Hide") : t("Show")}</Button>
-          <Button size="sm" variant="ghost" onClick={() => confirm(t("Delete this review?")) && run(() => A.setReviewStatusFn({ data: { id: r.id, status: "delete" } }))}>{t("Delete")}</Button>
+          <Button size="sm" variant="outline" data-testid={`admin-review-toggle-${r.id}`} onClick={() => run(() => A.setReviewStatusFn({ data: { id: r.id, status: r.status === "visible" ? "hidden" : "visible" } }))}>{r.status === "visible" ? t("Hide") : t("Show")}</Button>
+          <ConfirmButton testId={`admin-review-delete-${r.id}`} question={t("Delete this review?")} onConfirm={() => run(() => A.setReviewStatusFn({ data: { id: r.id, status: "delete" } }))}>{t("Delete")}</ConfirmButton>
         </Row>
       ))}
     </List>
@@ -230,7 +231,7 @@ function Payouts() {
           {p.status === "requested" && (
             <>
               <Button size="sm" data-testid={`payout-paid-${p.id}`} onClick={() => run(() => A.processPayoutFn({ data: { id: p.id, action: "paid", note: "" } }))}>{t("Mark as paid")}</Button>
-              <Button size="sm" variant="outline" onClick={() => run(() => A.processPayoutFn({ data: { id: p.id, action: "rejected", note: prompt(t("Reason")) ?? "" } }))}>{t("Reject")}</Button>
+              <ConfirmButton variant="outline" withNote testId={`payout-reject-${p.id}`} question={t("Reject this payout? The amount goes back to the seller's balance.")} onConfirm={(note) => run(() => A.processPayoutFn({ data: { id: p.id, action: "rejected", note } }))}>{t("Reject")}</ConfirmButton>
             </>
           )}
         </Row>

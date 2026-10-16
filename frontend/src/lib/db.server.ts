@@ -12,7 +12,7 @@ export function pool(): Pool {
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
       connectionLimit: 10,
-      charset: "utf8mb4",
+      charset: "UTF8MB4_UNICODE_CI",
       timezone: "Z",
       decimalNumbers: true,
       supportBigNumbers: true,

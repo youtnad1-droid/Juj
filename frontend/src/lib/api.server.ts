@@ -1,5 +1,5 @@
 import { ZodError } from "zod";
-import { loadUser, verifyToken } from "./auth.server";
+import { SESSION_COOKIE, loadUser, verifyToken } from "./auth.server";
 import { LOCALE_COOKIE, isLocale, type Locale } from "@/i18n/locales";
 
 export const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
@@ -17,7 +17,7 @@ const cookie = (request: Request, name: string) =>
 /** User from `Authorization: Bearer <access_token>` or the session cookie. */
 export async function userFromRequest(request: Request) {
   const bearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  const id = await verifyToken(bearer || cookie(request, "juj_at"), "access");
+  const id = bearer ? await verifyToken(bearer, "access") : await verifyToken(cookie(request, SESSION_COOKIE), "session");
   return id ? loadUser(id) : null;
 }
 

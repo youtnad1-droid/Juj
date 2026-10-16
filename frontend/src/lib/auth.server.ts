@@ -12,16 +12,19 @@ export type SessionUser = { id: string; email: string; role: Role; display_name:
 type Result = { ok: true } | { ok: false; error: string; retryAfterSec?: number };
 
 const ACCESS_TTL = 15 * 60;
-const REFRESH_TTL = 7 * 24 * 3600;
-const key = () => new TextEncoder().encode(process.env.JWT_SECRET);
+const SESSION_TTL = 7 * 24 * 3600;
+const key = () => new TextEncoder().encode(process.env["JWT_SECRET"]);
 const cookieOpts = (maxAge: number) => ({ httpOnly: true, secure: true, sameSite: "lax" as const, path: "/", maxAge });
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 
-export const signToken = (sub: string, type: "access" | "refresh", ttl: number) =>
+type TokenType = "access" | "session";
+export const SESSION_COOKIE = "juj_session";
+
+export const signToken = (sub: string, type: TokenType, ttl: number) =>
   new SignJWT({ type }).setProtectedHeader({ alg: "HS256" }).setSubject(sub).setIssuedAt()
     .setExpirationTime(Math.floor(Date.now() / 1000) + ttl).sign(key());
 
-export async function verifyToken(token: string | undefined | null, type: "access" | "refresh") {
+export async function verifyToken(token: string | undefined | null, type: TokenType) {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, key());
@@ -39,23 +42,17 @@ export async function loadUser(id: string): Promise<SessionUser | null> {
   return u && u.status === "active" ? { id: u.id, email: u.email, role: u.role, display_name: u.display_name } : null;
 }
 
+// One cookie per response: the SSR adapter keeps only the last Set-Cookie header.
 export async function startSession(userId: string) {
-  setCookie("juj_at", await signToken(userId, "access", ACCESS_TTL), cookieOpts(ACCESS_TTL));
-  setCookie("juj_rt", await signToken(userId, "refresh", REFRESH_TTL), cookieOpts(REFRESH_TTL));
+  setCookie(SESSION_COOKIE, await signToken(userId, "session", SESSION_TTL), cookieOpts(SESSION_TTL));
 }
 
 export function endSession() {
-  deleteCookie("juj_at", { path: "/" });
-  deleteCookie("juj_rt", { path: "/" });
+  deleteCookie(SESSION_COOKIE, { path: "/", httpOnly: true, secure: true, sameSite: "lax" });
 }
 
-/** Cookie session; silently renews the access cookie while the refresh cookie is valid. */
 export async function currentUser(): Promise<SessionUser | null> {
-  let id = await verifyToken(getCookie("juj_at"), "access");
-  if (!id) {
-    id = await verifyToken(getCookie("juj_rt"), "refresh");
-    if (id) setCookie("juj_at", await signToken(id, "access", ACCESS_TTL), cookieOpts(ACCESS_TTL));
-  }
+  const id = await verifyToken(getCookie(SESSION_COOKIE), "session");
   return id ? loadUser(id) : null;
 }
 

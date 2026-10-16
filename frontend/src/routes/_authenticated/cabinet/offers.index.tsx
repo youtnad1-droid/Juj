@@ -8,6 +8,7 @@ import { archiveOfferFn, fetchSellerOffers } from "@/lib/seller.functions";
 import { formatPrice, offerPath } from "@/lib/money";
 import { PageTitle } from "@/components/site/PanelLayout";
 import { StatusBadge } from "@/components/site/StatusBadge";
+import { ConfirmButton } from "@/components/site/ConfirmButton";
 import { useI18n } from "@/i18n";
 
 export const Route = createFileRoute("/_authenticated/cabinet/offers/")({
@@ -49,12 +50,11 @@ function Page() {
                 <TableCell><StatusBadge status={o.status} /></TableCell>
                 <TableCell className="whitespace-nowrap text-end">
                   <Button asChild size="icon" variant="ghost" aria-label="Edit"><Link to="/cabinet/offers/$id" params={{ id: String(o.id) }} data-testid={`edit-offer-${o.id}`}><Pencil className="h-4 w-4" /></Link></Button>
-                  <Button size="icon" variant="ghost" aria-label="Archive" data-testid={`archive-offer-${o.id}`} onClick={async () => {
-                    if (!confirm(t("Archive this offer? Buyers won't see it anymore."))) return;
+                  <ConfirmButton testId={`archive-offer-${o.id}`} question={t("Archive this offer? Buyers won't see it anymore.")} onConfirm={async () => {
                     await archiveOfferFn({ data: { id: o.id } });
                     toast.success(t("Offer archived"));
                     qc.invalidateQueries({ queryKey: ["seller-offers"] });
-                  }}><Archive className="h-4 w-4" /></Button>
+                  }}><Archive className="h-4 w-4" /></ConfirmButton>
                 </TableCell>
               </TableRow>
             ))}

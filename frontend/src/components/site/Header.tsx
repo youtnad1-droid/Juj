@@ -74,7 +74,7 @@ export function LanguageMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" aria-label="Language" data-testid="language-menu-button" className="gap-1 px-2">
+        <Button variant="ghost" size="sm" aria-label="Language" data-testid="language-menu-button" className="shrink-0 gap-1 px-2">
           <Globe className="h-4 w-4" />
           <span className="text-xs font-semibold uppercase">{locale}</span>
         </Button>
@@ -165,14 +165,14 @@ export function Header() {
           </SheetContent>
         </Sheet>
         <form
-          className="relative flex-1"
+          className="relative min-w-0 flex-1"
           onSubmit={(e) => {
             e.preventDefault();
             if (q.trim()) navigate({ to: "/search", search: { q: q.trim() } });
           }}
         >
           <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Search games, cards, keys…")} className="ps-9" maxLength={100} aria-label="Search" data-testid="header-search-input" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Search games, cards, keys…")} className="ps-9 placeholder:text-ellipsis" maxLength={100} aria-label="Search" data-testid="header-search-input" />
         </form>
         {panel ? (
           <Link to={panel} data-testid="header-panel-link" className="hidden items-center gap-1 text-sm font-medium hover:text-primary lg:flex">
@@ -182,7 +182,7 @@ export function Header() {
           <Link to="/sell" data-testid="header-start-selling" className="hidden text-sm font-medium hover:text-primary lg:block">{t("Start selling")}</Link>
         )}
         <LanguageMenu />
-        <Button asChild variant="ghost" size="icon" aria-label="Favorites" data-testid="header-favorites"><Link to="/favorites"><Heart className="h-5 w-5" /></Link></Button>
+        <Button asChild variant="ghost" size="icon" aria-label="Favorites" className="hidden sm:inline-flex" data-testid="header-favorites"><Link to="/favorites"><Heart className="h-5 w-5" /></Link></Button>
         <Button asChild variant="ghost" size="icon" aria-label="Orders" className="hidden sm:inline-flex" data-testid="header-orders"><Link to="/orders"><Package className="h-5 w-5" /></Link></Button>
         <ProfileMenu />
       </div>
